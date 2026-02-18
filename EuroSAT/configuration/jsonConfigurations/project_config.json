@@ -1,0 +1,14 @@
+{
+    "train_test_split": 0.2,
+    "tr_val_split": 0.2,
+    "seed": 42,
+    "dataset_root_path": "data",
+    "cache_directory": "data/cache",
+    "output_paths": {
+        "output_result_path": "result/ModelSelection",
+        "convergence": "optuna_convergence_best_value.png",
+        "history_html": "optuna_optimization_history_all_trials.html",
+        "importances_html": "param_importances.html"
+    },
+    "requirements_txt_path": "EuroSAT/requirements.txt"
+}

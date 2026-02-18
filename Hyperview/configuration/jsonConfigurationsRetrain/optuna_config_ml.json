@@ -1,0 +1,19 @@
+{
+  "study": {
+    "study_name": "model_selection_classic_features",
+    "direction": "minimize",
+    "storage": "null",
+    "load_if_exists": false
+  },
+  "execution": {
+    "n_jobs": 3,
+    "timeout_s": 200,
+    "n_trials": 100
+  },
+  "sampler": {
+    "type": "TPESampler",
+    "params": {
+      "seed": 42
+    }
+  }
+}

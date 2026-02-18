@@ -1,0 +1,189 @@
+MODEL SELECTION
+
+
+xg
+test1 MODEL SELECTION
+tmux new -s test1-EuroSAT-ModelSelection-Final
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test1-EuroSAT-ModelSelection-Final
+
+
+test2 MODEL SELECTION
+tmux new -s test2-EuroSAT-ModelSelection-Final
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test2-EuroSAT-ModelSelection-Final
+
+test3 MODEL SELECTION
+tmux new -s test3-EuroSAT-ModelSelection-Final
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test3-EuroSAT-ModelSelection-Final
+
+test4 MODEL SELECTION
+tmux new -s test4-EuroSAT-ModelSelection-Final
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test4-EuroSAT-ModelSelection-Final
+
+test5 MODEL SELECTION
+tmux new -s test5-EuroSAT-ModelSelection-Final
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test5-EuroSAT-ModelSelection-Final
+
+
+
+
+
+
+rf
+test1 MODEL SELECTION
+tmux new -s test1-EuroSAT-ModelSelection-Final-rf
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test1-EuroSAT-ModelSelection-Final-rf
+
+
+test2 MODEL SELECTION
+tmux new -s test2-EuroSAT-ModelSelection-Final-rf
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test2-EuroSAT-ModelSelection-Final-rf
+
+test3 MODEL SELECTION
+tmux new -s test3-EuroSAT-ModelSelection-Final-rf
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test3-EuroSAT-ModelSelection-Final-rf
+
+test4 MODEL SELECTION
+tmux new -s test4-EuroSAT-ModelSelection-Final-rf
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test4-EuroSAT-ModelSelection-Final-rf
+
+test5 MODEL SELECTION
+tmux new -s test5-EuroSAT-ModelSelection-Final-rf
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML
+Ctrl + b, then d
+tmux attach-session -t test5-EuroSAT-ModelSelection-Final-rf
+
+
+
+
+
+
+RETRAIN
+
+RF
+test1 RETRAIN
+tmux new -s test1-EuroSAT-rf-Retrain
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test1-EuroSAT-rf-Retrain
+
+
+test2 RETRAIN
+tmux new -s test2-EuroSAT-rf-Retrain
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test2-EuroSAT-rf-Retrain
+
+test3 RETRAIN
+tmux new -s test3-EuroSAT-rf-Retrain
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test3-EuroSAT-rf-Retrain
+
+test4 RETRAIN
+tmux new -s test4-EuroSAT-rf-Retrain
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test4-EuroSAT-rf-Retrain
+
+test5 RETRAIN
+tmux new -s test5-EuroSAT-rf-Retrain
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test5-EuroSAT-rf-Retrain
+
+
+
+
+
+(ricordati di cambiare hardcoded)
+xg
+test1 RETRAIN
+tmux new -s test1-EuroSAT-Retrain-xg
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test1-EuroSAT-Retrain-xg
+
+
+test2 RETRAIN
+tmux new -s test2-EuroSAT-Retrain-xg
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test2-EuroSAT-Retrain-xg
+
+test3 RETRAIN
+tmux new -s test3-EuroSAT-Retrain-xg
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test3-EuroSAT-Retrain-xg
+
+test4 RETRAIN
+tmux new -s test4-EuroSAT-Retrain-xg
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test4-EuroSAT-Retrain-xg
+
+test5 RETRAIN
+tmux new -s test5-EuroSAT-Retrain-xg
+make clean-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make setup-EuroSAT TMPDIR=/disk4/apardini-gdpalma-paper/tmpEuroSAT_p_user
+make test-EuroSAT-ML-retrain
+Ctrl + b, then d
+tmux attach-session -t test5-EuroSAT-Retrain-xg
+
+
