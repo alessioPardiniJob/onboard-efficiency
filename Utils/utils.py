@@ -17,17 +17,17 @@ from typing import (
     runtime_checkable,
     List,
 )
-
+from importlib.metadata import version, PackageNotFoundError
 import joblib
 
 
 # ─── Third-party libraries ─────────────────────────────────────────
-import pkg_resources
 import matplotlib.pyplot as plt
 import numpy as np
 import optuna
 import pandas as pd
 import psutil
+
 from scipy.stats import kurtosis, skew
 from skimage import color, feature, filters
 from skimage.feature import canny
@@ -841,33 +841,34 @@ def get_requirements_versions(project_cfg: Dict[str, Any]) -> Dict[str, str]:
     
     Returns:
         Dictionary mapping library names to installed versions (or None if not installed)
-    
-    Raises:
-        Exception: If file reading fails (prints warning instead of raising)
     """
+    import re
+    from importlib.metadata import version, PackageNotFoundError
+
     requirements_txt_path = project_cfg.get("requirements_txt_path", "requirements.txt")
-    requirements_txt = None
     installed_versions = {}
 
     if os.path.exists(requirements_txt_path):
         with open(requirements_txt_path, "r") as file:
             requirements_txt = file.read().strip()
         
-        libraries = [line.strip() for line in requirements_txt.splitlines() if line.strip()]
+        libraries = [line.strip() for line in requirements_txt.splitlines() if line.strip() and not line.startswith('#')]
         
-        for library in libraries:
+        for lib_line in libraries:
+            # Estrai solo il nome base della libreria, ignorando le versioni richieste nel .txt (es: da 'numpy==1.24.4' estrae 'numpy')
+            library_name = re.split('[=<>~]', lib_line)[0].strip()
+            
             try:
-                version = pkg_resources.get_distribution(library).version
-                installed_versions[library] = version
-            except pkg_resources.DistributionNotFound:
-                print(f"Warning: '{library}' is listed in requirements.txt but not installed.")
-                installed_versions[library] = None
+                lib_version = version(library_name)
+                installed_versions[library_name] = lib_version
+            except PackageNotFoundError:
+                print(f"Warning: '{library_name}' is listed in requirements.txt but not installed.")
+                installed_versions[library_name] = None
     else:
         print(f"Warning: '{requirements_txt_path}' not found. Proceeding without it.")
 
     project_cfg["requirements_versions"] = installed_versions
     return installed_versions
-
 
 def get_param_importances(study: optuna.study.Study) -> Dict[str, float]:
     """
