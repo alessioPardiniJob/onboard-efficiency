@@ -48,7 +48,7 @@ else:
 
 
 
-debug_mode: bool = True  # Set to True to load only a subset of the dataset for faster iterations during development.
+debug_mode: bool = False  # Subsampling for quick dev runs; enable via CLI flag `--debug`.
 # -----------------------------------------------------------------------------
 # Modular pipeline for dataset loading, feature extraction, optimization, and
 # result saving. Each function encapsulates a distinct responsibility for
@@ -430,7 +430,10 @@ if __name__ == "__main__":
                         help="Model type: 'rf' or 'xg'")
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size",
                         help="Search space size")
+    parser.add_argument("--debug", action="store_true", help="Enable debug/subsampling mode (loads a subset).")
     args = parser.parse_args()
+
+    debug_mode = args.debug
 
     # --- Calcolo Percorsi (Ancoraggio alla root del progetto) ---
     current_script_path = os.path.abspath(__file__)
@@ -543,5 +546,4 @@ if __name__ == "__main__":
         )
         
         print(f"[INFO] RUN {run_idx} COMPLETED SUCCESSFULLY.\n")
-
 

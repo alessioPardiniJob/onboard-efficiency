@@ -32,7 +32,7 @@ LABEL_MAXS = np.array([325.0, 625.0, 400.0, 7.8])
 COL_IX = [0, 1, 2, 3]
 args_eval = Namespace(col_ix=COL_IX, cons=LABEL_MAXS)
 
-debug_mode: bool = True
+debug_mode: bool = False
 
 # -----------------------------------------------------------------------------
 # Modular pipeline for dataset loading, feature extraction, optimization, and
@@ -351,55 +351,15 @@ class SpectralCurveFiltering: # Default class provided by the challenge organize
     def __call__(self, sample: np.ndarray):
         return self.merge_function(sample, axis=(1, 2))
 
-import os
-import requests
-import zipfile
-from tqdm import tqdm
-
-ZENODO_URL = "https://zenodo.org/records/18678998/files/data.zip?download=1"
-
-def download_file(url: str, output_path: str):
-    """Download file with progress bar."""
-    response = requests.get(url, stream=True)
-    response.raise_for_status()
-
-    total = int(response.headers.get("content-length", 0))
-
-    with open(output_path, "wb") as file, tqdm(
-        desc=f"Downloading {os.path.basename(output_path)}",
-        total=total,
-        unit="B",
-        unit_scale=True,
-        unit_divisor=1024,
-    ) as bar:
-        for data in response.iter_content(chunk_size=8192):
-            size = file.write(data)
-            bar.update(size)
-
-def extract_zip_flat(zip_path: str, extract_to: str):
-    """Extract zip removing the top-level folder if present."""
-    print(f"[INFO] Extracting {zip_path}...")
-
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        # Controlla se tutti i file hanno la stessa cartella top-level
-        names = zip_ref.namelist()
-        top_level = os.path.commonprefix(names).rstrip("/")
-
-        for member in names:
-            # Rimuove top-level
-            target_path = os.path.join(extract_to, member[len(top_level)+1:])
-            if member.endswith("/"):
-                os.makedirs(target_path, exist_ok=True)
-            else:
-                os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                with open(target_path, "wb") as outfile:
-                    outfile.write(zip_ref.read(member))
-
-    print("[INFO] Extraction completed.")
+AI4EO_DATASET_PAGE = "https://platform.ai4eo.eu/seeing-beyond-the-visible-permanent"
+EOTDL_DATASET_PAGE = "https://www.eotdl.com/datasets/SeeingBeyondTheVisible"
 
 def prepare_dataset(root_path: str, train_test_split: float = None):
     """
-    Load Hyperview dataset. If missing, download from Zenodo.
+    Load Hyperview dataset from disk.
+
+    Note: The HYPERVIEW dataset is not distributed with this repository and is
+    not downloaded automatically.
     """
 
     print(f"[INFO] Preparing dataset at: '{root_path}'")
@@ -409,36 +369,26 @@ def prepare_dataset(root_path: str, train_test_split: float = None):
     gt_data_path = os.path.join(root_path, "train_gt.csv")
 
     dataset_ready = (
-        os.path.exists(train_data_dir)
-        and os.path.exists(test_data_dir)
-        and os.path.exists(gt_data_path)
+        os.path.isdir(train_data_dir)
+        and os.path.isdir(test_data_dir)
+        and os.path.isfile(gt_data_path)
     )
 
-    # ✅ If dataset missing → download
     if not dataset_ready:
-        print("[WARN] Dataset not found locally.")
-        print("[INFO] Downloading dataset from Zenodo...")
-
-        os.makedirs(root_path, exist_ok=True)
-        zip_path = os.path.join(root_path, "data.zip")
-
-        download_file(ZENODO_URL, zip_path)
-        extract_zip_flat(zip_path, root_path)
-
-        # Optional cleanup
-        os.remove(zip_path)
-        print("[INFO] Zip file removed.")
-
-    else:
-        print("[INFO] Dataset already present. Skipping download.")
-
-    # ✅ Final safety check
-    if not os.path.exists(train_data_dir):
-        raise FileNotFoundError(f"Training directory not found: {train_data_dir}")
-    if not os.path.exists(test_data_dir):
-        raise FileNotFoundError(f"Test directory not found: {test_data_dir}")
-    if not os.path.exists(gt_data_path):
-        raise FileNotFoundError(f"Ground truth file not found: {gt_data_path}")
+        abs_root = os.path.abspath(root_path)
+        raise FileNotFoundError(
+            "HYPERVIEW dataset not found locally.\n\n"
+            f"Expected structure under: {abs_root}\n"
+            "  train_data/   (NPZ files)\n"
+            "  test_data/    (NPZ files)\n"
+            "  train_gt.csv\n\n"
+            "Please obtain the dataset from the official source (registration and acceptance of terms may be required):\n"
+            f"  {AI4EO_DATASET_PAGE}\n\n"
+            "Download instructions (EOTDL):\n"
+            f"  {EOTDL_DATASET_PAGE}\n\n"
+            "After downloading, set `dataset_root_path` to the folder that contains the files above "
+            "(default config points to `Hyperview/data`)."
+        )
 
     print(f"[INFO] Loading training data from: {train_data_dir}")
     print(f"[INFO] Loading test data from: {test_data_dir}")
@@ -892,7 +842,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hyperview Model Selection Pipeline")
     parser.add_argument("--model", type=str, default="rf", choices=["rf", "xg"], dest="cli_model", help="Model type")
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size", help="Config size")
+    parser.add_argument("--debug", action="store_true", help="Enable debug/subsampling mode (loads a small subset).")
     args = parser.parse_args()
+
+    debug_mode = args.debug
 
     # Path Resolution
     current_script_path = os.path.abspath(__file__)
@@ -1151,7 +1104,6 @@ if __name__ == "__main__":
                 "features_selected_metrics": features_selected_metrics
             }
         )
-
 
 
 

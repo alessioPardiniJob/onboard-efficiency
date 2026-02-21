@@ -68,6 +68,30 @@ Replace `[DATASET]` with one of:
 
 ---
 
+## Datasets
+
+### EuroSAT
+
+EuroSAT is downloaded automatically via `torchvision.datasets.EuroSAT` when you run the EuroSAT pipelines.
+
+### HYPERVIEW (Seeing Beyond the Visible)
+
+The HYPERVIEW Challenge dataset is **not distributed with this repository** and is **not downloaded automatically** by the code. Please obtain it from the official source (registration and acceptance of terms may be required):
+
+- ESA Φ-lab AI4EO platform: https://platform.ai4eo.eu/seeing-beyond-the-visible-permanent
+
+Download instructions (including the EOTDL tool) are available here:
+
+- https://www.eotdl.com/datasets/SeeingBeyondTheVisible
+
+Place the dataset under the path configured by `dataset_root_path` (default: `Hyperview/data`) with this structure:
+
+```
+train_data/   (NPZ files)
+test_data/    (NPZ files)
+train_gt.csv
+```
+
 ### Environment Setup
 
 Creates the dataset-specific virtual environment and installs dependencies.
@@ -146,4 +170,5 @@ make clean-Hyperview
 - Each dataset uses an isolated virtual environment: `[DATASET]/venv`
 - Hyperparameter search results are persisted automatically
 - Experiments are deterministic where seeds are defined
+- Debug/subsampling is disabled by default; run the Python entrypoints directly with `--debug` for quick development runs.
 - Re-running targets overwrites previous outputs unless explicitly cached

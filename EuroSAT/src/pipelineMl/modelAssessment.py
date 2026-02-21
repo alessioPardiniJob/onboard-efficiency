@@ -37,7 +37,7 @@ except AttributeError:
 else:
     ssl._create_default_https_context = _create_unverified_https_context
 
-debug_mode: bool = True
+debug_mode: bool = False
 
 # -----------------------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -234,7 +234,10 @@ if __name__ == "__main__":
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size", help="Config size")
     parser.add_argument("--best-params-mode", type=str, default="manual", choices=["manual", "auto"], 
                         help="How to get hyperparameters: 'manual' (hardcoded) or 'auto' (from best previous result)")
+    parser.add_argument("--debug", action="store_true", help="Enable debug/subsampling mode (loads a subset).")
     args = parser.parse_args()
+
+    debug_mode = args.debug
 
     # --- Path Resolution ---
     current_script_path = os.path.abspath(__file__)
