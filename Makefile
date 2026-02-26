@@ -48,8 +48,9 @@ help:
 	@echo "                                Options: MODEL=rf|xg SIZE=small|big"
 	@echo ""
 	@echo "Deep Learning Pipeline (Module: DiPalma):"
-	@echo "  make dl-select-EuroSAT      : Executes DL training and selection."
-	@echo "  make dl-assess-EuroSAT      : Executes DL assessment."
+	@echo "  make dl-select-EuroSAT      : Executes DL Model Selection (Optuna optimization)."
+	@echo "  make dl-assess-EuroSAT      : Executes DL Model Assessment (Retrain + Evaluate)."
+	@echo "                                Options: MODE=manual|auto"
 	@echo ""
 	@echo "modelSelectiontenance:"
 	@echo "  make clean-EuroSAT          : Removes virtual environment and temporary files."
@@ -130,11 +131,12 @@ dl-select-%:
 # 2. Model Assessment (DL)
 dl-assess-%:
 	@echo
-	@echo "---- 📉 DL Model ASSESSMENT for $* ----"
+	@echo "---- 📉 DL Model ASSESSMENT for $* [Mode: $(MODE)] ----"
 	@if [ ! -d "$*/venv" ]; then echo "❌ Error: Environment not found. Please run 'make setup-$*' first."; exit 1; fi
 	
-	bash -c 'set -e; \
-		$(call VENV_PYTHON_PATH) "$*/code-DiPalma/retrain_best.py"' \
+	@bash -c 'set -e; \
+		$(call VENV_PYTHON_PATH) "$*/src/pipelineDl/modelAssessment.py" \
+		--best-params-mode $(MODE)' \
 		|| { echo "❌ DL Assessment failed for $*."; exit 1; }
 	
 	@echo "✅ DL Assessment completed successfully for $*."
