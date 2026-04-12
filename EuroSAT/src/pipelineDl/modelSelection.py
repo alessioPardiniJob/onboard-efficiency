@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 
 from Utils import utils, dp_utils
 from Utils import dataloader as dl
+from Utils.dl_config import ensure_training_params
 
 import ssl
 import urllib.request
@@ -218,6 +219,7 @@ if __name__ == "__main__":
         print(f"[CRITICAL ERROR] {e}")
         sys.exit(1)
 
+    project_cfg_initial = ensure_training_params(project_cfg_initial)
     project_cfg_initial["dataset_name"] = dataset_name
 
     # --- Fix Relative Paths ---
@@ -229,6 +231,10 @@ if __name__ == "__main__":
     raw_output_path = project_cfg_initial["output_paths"]["output_result_path"]
     if not os.path.isabs(raw_output_path):
         raw_output_path = os.path.join(project_root, raw_output_path)
+
+    selection_root = raw_output_path
+    if os.path.basename(os.path.normpath(selection_root)) != "ModelSelection":
+        selection_root = os.path.join(selection_root, "ModelSelection")
 
     # --- Setup ---
     set_random_seed(int(project_cfg_initial['seed']))
@@ -253,7 +259,7 @@ if __name__ == "__main__":
         project_cfg = copy.deepcopy(project_cfg_initial)
         optuna_cfg = copy.deepcopy(optuna_cfg_initial)
 
-        run_output_path = os.path.join(raw_output_path, "ModelSelection", f"test_{run_idx}")
+        run_output_path = os.path.join(selection_root, f"test_{run_idx}")
         project_cfg["output_paths"]["output_result_path"] = run_output_path
 
         # --- Optuna Optimization ---

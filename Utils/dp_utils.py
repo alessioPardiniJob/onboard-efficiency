@@ -52,6 +52,7 @@ import random
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 from Utils.dataloader import CustomDataset, train_transform, get_dataloader
+from Utils.kd_utils import build_kd_loss
 
 import Utils.dataloader as dl
 
@@ -60,6 +61,11 @@ import copy
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 DEVICE = torch.device(device)
+
+
+def _reset_tracemalloc_peak_if_supported():
+    if hasattr(tracemalloc, "reset_peak"):
+        tracemalloc.reset_peak()
 
 
  
@@ -229,7 +235,7 @@ def deep_learning_evaluate_tuning_results(
     best_model.load_state_dict(best_wts)
     torch.save(best_model.state_dict(), config["output_paths"]["output_result_path"] + f"/best_final_model_{run}")
     _, peak_trace_train = tracemalloc.get_traced_memory()
-    tracemalloc.reset_peak()
+    _reset_tracemalloc_peak_if_supported()
     mem_rss_after_train = proc.memory_info().rss / (1024 ** 2)
     rss_delta_train_mb = mem_rss_after_train - mem_rss_before_train
     
@@ -333,7 +339,7 @@ def prune_optimization(
         
     prune_duration = time.perf_counter() - t0
     _, peak_trace_prune = tracemalloc.get_traced_memory()
-    tracemalloc.reset_peak()
+    _reset_tracemalloc_peak_if_supported()
     mem_rss_after_prune = proc.memory_info().rss / (1024 ** 2)
     rss_delta_prune_mb = mem_rss_after_prune - mem_rss_before_prune
     torch.save(pruned_model.state_dict(), config["output_paths"]["output_result_path"] + f"/pruned_model_{run}")
@@ -433,7 +439,7 @@ def quantize_optimization(
     quantized_model = torch.quantization.convert(prepared_model)
     quant_duration = time.perf_counter() - t0
     _, peak_trace_quant = tracemalloc.get_traced_memory()
-    tracemalloc.reset_peak()
+    _reset_tracemalloc_peak_if_supported()
     mem_rss_after_quant = proc.memory_info().rss / (1024 ** 2)
     rss_delta_quant_mb = mem_rss_after_quant - mem_rss_before_quant
     torch.save(quantized_model.state_dict(), config["output_paths"]["output_result_path"] + f"/quantized_model_{run}")
@@ -478,16 +484,18 @@ def quantize_optimization(
     return results
 
 def train_knowledge_distillation(teacher, student, dist_params, criterion, optimizer, scheduler, train_dataloader, val_dataloader, project_cfg, run, ds):
-    ce_loss = nn.CrossEntropyLoss()
     teacher.eval()
 
-    epoch_number = 0
     best_vloss = 1_000_000.
     patience = 0
     max_patience = project_cfg["training_params"]["max_patience"]
     max_epochs = project_cfg["training_params"]["max_epochs_training"]
-    
-    T = dist_params["temperature"]
+    best_wts = copy.deepcopy(student.state_dict())
+    kd_loss = build_kd_loss(
+        ds,
+        alpha=dist_params["alpha"],
+        temperature=dist_params.get("temperature", 1.0),
+    )
 
     for epoch in range(max_epochs):
         student.train() # Student to train mode
@@ -502,22 +510,21 @@ def train_knowledge_distillation(teacher, student, dist_params, criterion, optim
         for _, data in enumerate(train_dataloader):
             inputs, labels = data
             optimizer.zero_grad()
+            inputs_device = inputs.to(device, non_blocking=True)
+            labels_device = labels.to(device, non_blocking=True)
             with torch.no_grad():
-                teacher_logits = teacher(inputs.to(device, non_blocking=True))
-            student_logits = student(inputs.to(device, non_blocking=True))
+                teacher_outputs = teacher(inputs_device)
+            student_outputs = student(inputs_device)
 
-            # Calculate the soft targets loss. Scaled by T**2 as suggested by the authors of the paper "Distilling the knowledge in a neural network"
-            log_probs = nn.functional.log_softmax(student_logits / T, dim=-1)
-            target_probs = nn.functional.softmax(teacher_logits / T, dim=-1)
-            soft_targets_loss = nn.functional.kl_div(log_probs, target_probs, reduction='batchmean')
+            distillation_loss = kd_loss(student_outputs, teacher_outputs, labels_device)
 
-            soft_targets_loss.backward()
+            distillation_loss.backward()
             optimizer.step()
-            running_loss += soft_targets_loss.item()
+            running_loss += distillation_loss.item()
             
             if ds == "eurosat":
-                _, predictions = student_logits.max(dim=-1)
-                num_correct += (predictions == labels.to(device, non_blocking=True)).sum()
+                _, predictions = student_outputs.max(dim=-1)
+                num_correct += (predictions == labels_device).sum()
                 num_samples += predictions.size(0)
 
         student.eval()
@@ -540,6 +547,7 @@ def train_knowledge_distillation(teacher, student, dist_params, criterion, optim
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
             patience = 0
+            best_wts = copy.deepcopy(student.state_dict())
         else:
             if patience >= max_patience:
                 break
@@ -547,9 +555,8 @@ def train_knowledge_distillation(teacher, student, dist_params, criterion, optim
 
         if scheduler:
             scheduler.step()
-        epoch_number += 1
-        
-    return
+
+    return best_wts
 
 def distill_optimization(
     ds_train,
@@ -567,13 +574,15 @@ def distill_optimization(
     best_params = build_model_params.get("best_params")
     run = build_model_params.get("Run")
     seed = build_model_params.get("Seed")
+    distillation_params = build_model_params.get("distillation_params", {})
 
     std, mean = (0,0)    
+    baseline_train_data = ds_train
     if ds == "hyperview":
         X_train, y_train = ds_train
         mean = y_train.mean(axis=0)
         std = y_train.std(axis=0)
-        ds_train = CustomDataset(X_train, y_train, train_transform, mean, std)
+        baseline_train_data = CustomDataset(X_train, y_train, train_transform, mean, std)
         ds_test = TensorDataset(ds_test)  
         
     # Instantiate model
@@ -594,28 +603,28 @@ def distill_optimization(
     # --- BASELINE TRAINING PHASE ---
     mem_rss_before_train = proc.memory_info().rss / (1024 ** 2)
     tracemalloc.start()    
-    train_dataloader = DataLoader(ds_train, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(baseline_train_data, batch_size=batch_size, shuffle=True)
     t0 = time.perf_counter()
     best_wts = train(student_baseline, criterion_baseline, optimizer_baseline, scheduler_baseline, train_dataloader, None, False, config, ds)
     train_duration = time.perf_counter() - t0
     best_model_baseline.load_state_dict(best_wts)
     torch.save(best_model_baseline.state_dict(), config["output_paths"]["output_result_path"] + f"/best_student_baseline_model_{run}")
     _, peak_trace_train = tracemalloc.get_traced_memory()
-    tracemalloc.reset_peak()
+    _reset_tracemalloc_peak_if_supported()
     mem_rss_after_train = proc.memory_info().rss / (1024 ** 2)
     rss_delta_train_mb = mem_rss_after_train - mem_rss_before_train
        
     # --- DISTILLATION PHASE ---
-    distillation_params = {}
-    distillation_params["temperature"] = 2
-    distillation_params["soft_target_loss_weight"] = 0.9
-    distillation_params["ce_loss_weight"] = 0.1
+    distillation_params = {
+        "temperature": distillation_params.get("temperature", 2.0),
+        "alpha": distillation_params.get("alpha", 0.9),
+    }
     
     mem_rss_before_dist = proc.memory_info().rss / (1024 ** 2)
     tracemalloc.start()
     train_dataloader, val_dataloader = dl.get_dataloader(ds_train, ds, config, batch_size)
     t0 = time.perf_counter()
-    train_knowledge_distillation(
+    best_student_wts = train_knowledge_distillation(
         teacher,
         student,
         distillation_params,
@@ -625,12 +634,13 @@ def distill_optimization(
         train_dataloader,
         val_dataloader,
         config,
-        ds,
-        run
-    )    
+        run,
+        ds
+    )
     dist_duration = time.perf_counter() - t0
+    student.load_state_dict(best_student_wts)
     _, peak_trace_dist = tracemalloc.get_traced_memory()
-    tracemalloc.reset_peak()
+    _reset_tracemalloc_peak_if_supported()
     mem_rss_after_dist = proc.memory_info().rss / (1024 ** 2)
     rss_delta_dist_mb = mem_rss_after_dist - mem_rss_before_dist
     torch.save(student.state_dict(), config["output_paths"]["output_result_path"] + f"/student_model_{run}")

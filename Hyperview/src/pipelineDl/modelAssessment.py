@@ -22,6 +22,8 @@ from typing import Any, Dict, Optional
 import Utils.utils as utils
 import Utils.dp_utils as dp_utils
 import Utils.dataloader as dl
+from Utils.dl_config import ensure_training_params, normalize_directory_dataset_root
+from Utils.kd_experiment import resolve_kd_study_config, resolve_student_variant_specs
 
 
 debug_mode: bool = False
@@ -62,6 +64,7 @@ def prepare_hyperview(root_path: str):
             train_data = (X_train, y_train) tensors
             X_test = tensor
     """
+    root_path = normalize_directory_dataset_root(root_path)
     X_train_base, sizes = dl.load_data(root_path + "train_data", tr=dl.resize_and_reduce_transform)
     y_train_base = dl.load_gt(root_path + "train_gt.csv")
     X_test_base, _ = dl.load_data(root_path + "test_data", tr=dl.resize_and_reduce_transform)
@@ -111,21 +114,34 @@ def get_model(model_name, pretrained, ds):
     return model
 
 
-def get_student_model(model_name, ds):
+def get_student_model(model_name, ds, student_variant="small"):
     if ds == "eurosat":
         num_classes = 10
     elif ds == "hyperview":
         num_classes = 4
 
-    if model_name == "mobilenetv3":
+    student_specs = resolve_student_variant_specs()
+    variant_name = student_specs[model_name][student_variant]
+
+    if variant_name == "mobilenet_v3_small":
         model = models.mobilenet_v3_small(weights=None)
         in_features = model.classifier[3].in_features
         model.classifier[3] = nn.Linear(in_features, num_classes)
-    elif model_name == "resnet":
+    elif variant_name == "mobilenet_v3_large":
+        model = models.mobilenet_v3_large(weights=None)
+        in_features = model.classifier[3].in_features
+        model.classifier[3] = nn.Linear(in_features, num_classes)
+    elif variant_name == "resnet18":
         model = models.resnet18(weights=None)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
-    elif model_name == "shufflenet":
+    elif variant_name == "resnet50":
+        model = models.resnet50(weights=None)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    elif variant_name == "shufflenet_v2_x0_5":
         model = models.shufflenet_v2_x0_5(weights=None)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    elif variant_name == "shufflenet_v2_x1_0":
+        model = models.shufflenet_v2_x1_0(weights=None)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
 
     model.to(DEVICE)
@@ -167,6 +183,8 @@ def best_model_builder(
     else:
         model_name = params.get("model")
 
+    student_variant = config.get("kd_study", {}).get("student_variant", "small")
+
     if config["training_params"]["pretrained"]:
         pretrained = config["training_params"]["pretrained"]
     else:
@@ -188,7 +206,7 @@ def best_model_builder(
     if opt == "quant":
         model = get_quantization_model(model_name, ds)
     elif opt == "dist":
-        model = get_student_model(model_name, ds)
+        model = get_student_model(model_name, ds, student_variant)
     else:
         model = get_model(model_name, pretrained, ds)
 
@@ -272,6 +290,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="HyperView DL Model Assessment (Retrain + Evaluate)")
     parser.add_argument("--best-params-mode", type=str, default="manual", choices=["manual", "auto"],
                         help="How to get hyperparameters: 'manual' (hardcoded) or 'auto' (from best previous result)")
+    parser.add_argument("--kd-enabled", action="store_true", help="Enable distillation runs.")
+    parser.add_argument("--prune-enabled", action="store_true", help="Enable pruning runs.")
+    parser.add_argument("--quant-enabled", action="store_true", default=False, help="Enable quantization runs explicitly.")
+    parser.add_argument("--kd-alpha", type=float, default=None, help="KD alpha weight.")
+    parser.add_argument("--kd-temperature", type=float, default=None, help="KD temperature for classification KD.")
+    parser.add_argument("--kd-student-variant", type=str, default=None, choices=["small", "medium"], help="Student capacity variant.")
+    parser.add_argument("--output-tag", type=str, default=None, help="Optional suffix added to assessment output folder.")
+    parser.add_argument("--assessment-seeds", type=str, default=None, help="Comma-separated seed override list.")
     args = parser.parse_args()
 
     # --- Path Resolution ---
@@ -293,15 +319,22 @@ if __name__ == "__main__":
         print(f"[CRITICAL ERROR] {e}")
         sys.exit(1)
 
+    project_cfg = ensure_training_params(project_cfg)
     project_cfg["dataset_name"] = dataset_name
+    kd_study = resolve_kd_study_config(args, dataset_name)
+    project_cfg["kd_study"] = kd_study
 
     # --- Fix Relative Paths ---
+    if not os.path.isabs(project_cfg['dataset_root_path']):
+        project_cfg['dataset_root_path'] = os.path.join(project_root, project_cfg['dataset_root_path'])
     if not os.path.isabs(project_cfg.get('cache_directory', 'data/cache')):
         project_cfg['cache_directory'] = os.path.join(project_root, project_cfg.get('cache_directory', 'data/cache'))
 
     raw_output_path = project_cfg["output_paths"]["output_result_path"]
     if not os.path.isabs(raw_output_path):
         raw_output_path = os.path.join(project_root, raw_output_path)
+    if kd_study["output_tag"]:
+        raw_output_path = os.path.join(raw_output_path, kd_study["output_tag"])
 
     raw_req_path = project_cfg.get("requirements_txt_path", "requirements.txt")
     if not os.path.isabs(raw_req_path):
@@ -314,7 +347,7 @@ if __name__ == "__main__":
     initialize_environment(project_cfg["cache_directory"])
 
     # --- Dataset ---
-    ds_train, ds_test = prepare_hyperview("/root/HyperView/data/")
+    ds_train, ds_test = prepare_hyperview(project_cfg['dataset_root_path'])
 
     # =========================================================================
     # 1. RETRIEVE BEST PARAMETERS
@@ -357,12 +390,13 @@ if __name__ == "__main__":
     evaluation_metrics = []
     extra = []
 
-    for i in range(5):
-        seed = int.from_bytes(os.urandom(4), "little")
+    assessment_seeds = kd_study["assessment_seeds"] or [int.from_bytes(os.urandom(4), "little") for _ in range(5)]
+
+    for i, seed in enumerate(assessment_seeds):
         set_random_seed(seed)
 
         print(f"\n{'#'*60}")
-        print(f" STARTING ASSESSMENT SEED {seed} — Trial ({i+1}/5)")
+        print(f" STARTING ASSESSMENT SEED {seed} — Trial ({i+1}/{len(assessment_seeds)})")
         print(f"{'#'*60}\n")
 
         current_project_cfg = copy.deepcopy(project_cfg)
@@ -374,7 +408,8 @@ if __name__ == "__main__":
             "Seed": seed,
             "Run": i + 1,
             "Config": current_project_cfg,
-            "best_params": best_params
+            "best_params": best_params,
+            "distillation_params": kd_study["distillation_params"],
         }
 
         # --- Evaluate (train + inference) ---
@@ -387,37 +422,40 @@ if __name__ == "__main__":
                 ds=dataset_name
             )
         )
-        print(f"[INFO] Evaluating Tuning Results completed. Trial ({i+1}/5)")
+        print(f"[INFO] Evaluating Tuning Results completed. Trial ({i+1}/{len(assessment_seeds)})")
 
         # --- Extra optimizations ---
         extra.append({})
 
-        extra[i]["Pruning"] = dp_utils.prune_optimization(
-            ds_train,
-            ds_test,
-            build_model=best_model_builder,
-            build_model_params=build_model_params,
-            ds=dataset_name
-        )
-        print(f"[INFO] Pruning Optimization completed. Trial ({i+1}/5)")
+        if kd_study["run_flags"]["pruning"] or not any(kd_study["run_flags"].values()):
+            extra[i]["Pruning"] = dp_utils.prune_optimization(
+                ds_train,
+                ds_test,
+                build_model=best_model_builder,
+                build_model_params=build_model_params,
+                ds=dataset_name
+            )
+            print(f"[INFO] Pruning Optimization completed. Trial ({i+1}/{len(assessment_seeds)})")
 
-        extra[i]["Quantization"] = dp_utils.quantize_optimization(
-            ds_train,
-            ds_test,
-            build_model=best_model_builder,
-            build_model_params=build_model_params,
-            ds=dataset_name
-        )
-        print(f"[INFO] Quantization Optimization completed. Trial ({i+1}/5)")
+        if kd_study["run_flags"]["quantization"] or not any(kd_study["run_flags"].values()):
+            extra[i]["Quantization"] = dp_utils.quantize_optimization(
+                ds_train,
+                ds_test,
+                build_model=best_model_builder,
+                build_model_params=build_model_params,
+                ds=dataset_name
+            )
+            print(f"[INFO] Quantization Optimization completed. Trial ({i+1}/{len(assessment_seeds)})")
 
-        extra[i]["Distillation"] = dp_utils.distill_optimization(
-            ds_train,
-            ds_test,
-            build_model=best_model_builder,
-            build_model_params=build_model_params,
-            ds=dataset_name
-        )
-        print(f"[INFO] Distillation Optimization completed. Trial ({i+1}/5)")
+        if kd_study["run_flags"]["distillation"] or not any(kd_study["run_flags"].values()):
+            extra[i]["Distillation"] = dp_utils.distill_optimization(
+                ds_train,
+                ds_test,
+                build_model=best_model_builder,
+                build_model_params=build_model_params,
+                ds=dataset_name
+            )
+            print(f"[INFO] Distillation Optimization completed. Trial ({i+1}/{len(assessment_seeds)})")
 
     # --- Save Final Results ---
     utils.save_run_results(
