@@ -21,6 +21,7 @@ from typing import Any, Dict, Optional
 import Utils.utils as utils
 import Utils.dp_utils as dp_utils
 import Utils.dataloader as dl
+from Utils.dl_config import ensure_training_params, normalize_directory_dataset_root
 
 
 debug_mode: bool = False
@@ -64,6 +65,7 @@ def prepare_hyperview(root_path: str):
             train_data = (X_train, y_train) tensors
             X_test = tensor
     """
+    root_path = normalize_directory_dataset_root(root_path)
     X_train_base, sizes = dl.load_data(root_path + "train_data", tr=dl.resize_and_reduce_transform)
     y_train_base = dl.load_gt(root_path + "train_gt.csv")
     X_test_base, _ = dl.load_data(root_path + "test_data", tr=dl.resize_and_reduce_transform)
@@ -208,9 +210,12 @@ if __name__ == "__main__":
         print(f"[CRITICAL ERROR] {e}")
         sys.exit(1)
 
+    project_cfg_initial = ensure_training_params(project_cfg_initial)
     project_cfg_initial["dataset_name"] = dataset_name
 
     # --- Fix Relative Paths ---
+    if not os.path.isabs(project_cfg_initial['dataset_root_path']):
+        project_cfg_initial['dataset_root_path'] = os.path.join(project_root, project_cfg_initial['dataset_root_path'])
     if not os.path.isabs(project_cfg_initial.get('cache_directory', 'data/cache')):
         project_cfg_initial['cache_directory'] = os.path.join(project_root, project_cfg_initial.get('cache_directory', 'data/cache'))
 
@@ -223,7 +228,7 @@ if __name__ == "__main__":
     initialize_environment(project_cfg_initial["cache_directory"])
 
     # --- Dataset ---
-    ds_train, ds_test = prepare_hyperview("/root/HyperView/data/")
+    ds_train, ds_test = prepare_hyperview(project_cfg_initial['dataset_root_path'])
 
     # =========================================================================
     #  LOOP — 5 Independent Optuna Runs
