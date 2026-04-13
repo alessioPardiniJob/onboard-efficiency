@@ -389,6 +389,7 @@ if __name__ == "__main__":
 
     evaluation_metrics = []
     extra = []
+    final_project_cfg = copy.deepcopy(project_cfg)
 
     assessment_seeds = kd_study["assessment_seeds"] or [int.from_bytes(os.urandom(4), "little") for _ in range(5)]
 
@@ -403,6 +404,7 @@ if __name__ == "__main__":
         seed_output_path = os.path.join(raw_output_path, assessment_folder_name, f"test_{i+1}")
         current_project_cfg["output_paths"]["output_result_path"] = seed_output_path
         os.makedirs(seed_output_path, exist_ok=True)
+        final_project_cfg = current_project_cfg
 
         build_model_params = {
             "Seed": seed,
@@ -459,7 +461,7 @@ if __name__ == "__main__":
 
     # --- Save Final Results ---
     utils.save_run_results(
-        project_cfg=project_cfg,
+        project_cfg=final_project_cfg,
         cfg_file_path={'optuna_config_filepath': optuna_cfg_file, 'project_config_filepath': project_cfg_file},
         feature_metrics=None,
         optuna_run_metrics={},
