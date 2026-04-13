@@ -12,11 +12,9 @@ def resolve_student_variant_specs():
         },
         "mobilenetv3": {
             "small": "mobilenet_v3_small",
-            "medium": "mobilenet_v3_large",
         },
         "shufflenet": {
             "small": "shufflenet_v2_x0_5",
-            "medium": "shufflenet_v2_x1_0",
         },
     }
 

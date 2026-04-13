@@ -129,6 +129,8 @@ def get_student_model(model_name, ds, student_variant="small"):
         num_classes = 4
 
     student_specs = resolve_student_variant_specs()
+    if student_variant not in student_specs[model_name]:
+        raise ValueError(f"Unsupported student variant '{student_variant}' for family '{model_name}'")
     variant_name = student_specs[model_name][student_variant]
 
     if variant_name == "mobilenet_v3_small":
