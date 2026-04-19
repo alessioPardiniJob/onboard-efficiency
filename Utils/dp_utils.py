@@ -53,6 +53,7 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 from Utils.dataloader import CustomDataset, train_transform, get_dataloader
 from Utils.kd_utils import build_kd_loss
+from Utils.kd_experiment import resolve_teacher_checkpoint_path
 
 import Utils.dataloader as dl
 
@@ -233,7 +234,10 @@ def deep_learning_evaluate_tuning_results(
     best_wts = train(model, criterion, optimizer, scheduler, train_dataloader, None, False, config, ds)
     train_duration = time.perf_counter() - t0
     best_model.load_state_dict(best_wts)
-    torch.save(best_model.state_dict(), config["output_paths"]["output_result_path"] + f"/best_final_model_{run}")
+    checkpoint_dir = config["output_paths"]["output_result_path"]
+    torch.save(best_model.state_dict(), checkpoint_dir + f"/best_final_model_{run}")
+    if seed is not None:
+        torch.save(best_model.state_dict(), checkpoint_dir + f"/best_final_model_seed_{seed}")
     _, peak_trace_train = tracemalloc.get_traced_memory()
     _reset_tracemalloc_peak_if_supported()
     mem_rss_after_train = proc.memory_info().rss / (1024 ** 2)
@@ -588,7 +592,8 @@ def distill_optimization(
     # Instantiate model
     
     teacher, _, _, _, _ = build_model(best_params, config, None, ds)
-    teacher.load_state_dict(torch.load(config["output_paths"]["output_result_path"] + f"/best_final_model_{run}"))    
+    teacher_checkpoint_path = resolve_teacher_checkpoint_path(config, run, seed=seed)
+    teacher.load_state_dict(torch.load(teacher_checkpoint_path))    
     teacher.eval()   
     
     student, optimizer, scheduler, batch_size, criterion = build_model(best_params, config, "dist", ds)

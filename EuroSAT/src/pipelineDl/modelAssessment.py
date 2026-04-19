@@ -303,9 +303,11 @@ if __name__ == "__main__":
     parser.add_argument("--kd-enabled", action="store_true", help="Enable distillation runs.")
     parser.add_argument("--prune-enabled", action="store_true", help="Enable pruning runs.")
     parser.add_argument("--quant-enabled", action="store_true", default=False, help="Enable quantization runs explicitly.")
+    parser.add_argument("--baseline-only", action="store_true", help="Run only the baseline evaluation without pruning, quantization, or distillation.")
     parser.add_argument("--kd-alpha", type=float, default=None, help="KD alpha weight.")
     parser.add_argument("--kd-temperature", type=float, default=None, help="KD temperature for classification KD.")
     parser.add_argument("--kd-student-variant", type=str, default=None, choices=["small", "medium"], help="Student capacity variant.")
+    parser.add_argument("--teacher-checkpoint-root", type=str, default=None, help="Optional shared result root containing baseline teacher checkpoints to reuse across KD runs.")
     parser.add_argument("--output-tag", type=str, default=None, help="Optional suffix added to assessment output folder.")
     parser.add_argument("--assessment-seeds", type=str, default=None, help="Comma-separated seed override list.")
     args = parser.parse_args()
@@ -404,6 +406,7 @@ if __name__ == "__main__":
     evaluation_metrics = []
     extra = []
     final_project_cfg = copy.deepcopy(project_cfg)
+    baseline_only = kd_study.get("baseline_only", False)
 
     for i in range(len(seeds)):
         seed = seeds[i]
@@ -441,7 +444,7 @@ if __name__ == "__main__":
         # --- Extra optimizations ---
         extra.append({})
 
-        if kd_study["run_flags"]["quantization"] or not any(kd_study["run_flags"].values()):
+        if not baseline_only and (kd_study["run_flags"]["quantization"] or not any(kd_study["run_flags"].values())):
             extra[i]["Quantization"] = dp_utils.quantize_optimization(
                 ds_train,
                 ds_test,
@@ -451,7 +454,7 @@ if __name__ == "__main__":
             )
             print(f"[INFO] Quantization Optimization completed. Trial ({i+1}/{len(seeds)})")
 
-        if kd_study["run_flags"]["pruning"]:
+        if not baseline_only and kd_study["run_flags"]["pruning"]:
             extra[i]["Pruning"] = dp_utils.prune_optimization(
                 ds_train,
                 ds_test,
@@ -461,7 +464,7 @@ if __name__ == "__main__":
             )
             print(f"[INFO] Pruning Optimization completed. Trial ({i+1}/{len(seeds)})")
 
-        if kd_study["run_flags"]["distillation"]:
+        if not baseline_only and kd_study["run_flags"]["distillation"]:
             extra[i]["Distillation"] = dp_utils.distill_optimization(
                 ds_train,
                 ds_test,

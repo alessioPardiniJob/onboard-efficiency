@@ -139,22 +139,80 @@ make ml-assess-EuroSAT MODEL=xg SIZE=small MODE=manual
 
 ### Hyperview-specific Assessment
 
-For `Hyperview`, assessment results are not directly computed locally. After retraining, model outputs must be submitted on the official Hyperview platform. Submission results are stored in the project under:
+For `Hyperview`, local assessment produces submission CSVs, while the final challenge score must still be obtained from the official Hyperview platform. Outputs are written under:
+
 ```bash
-Hyperview/result/modelAssessment/<model_name>/test<n>/
+Hyperview/result/<assessment-tag>/ModelAssessment/test_<run>/
 ```
-Each test seed produces a separate folder (`test1`, `test2`, etc.) containing the assessment metrics. This ensures that evaluation follows Hyperview's official protocol.
+
+Each assessment run stores its own weights, JSON summary, and submission files inside `test_1`, `test_2`, and so on. This keeps the local retraining artifacts aligned with the files that must be submitted for official scoring.
 
 
 ## Deep Learning Pipeline
 
-Deep learning experiments follow the same structure:
+Deep learning experiments follow the same structure for the standard selection and assessment flow:
 
 ```bash
 make dl-select-[DATASET]
 make dl-assess-[DATASET]
 ```
-(Refer to dataset-specific configuration files for architecture and training parameters.)
+
+Refer to the dataset-specific configuration files for architecture and training parameters.
+
+### Advanced DL Assessment Flags
+
+The `Makefile` exposes only the default DL assessment path. For distillation, pruning, quantization, or shared-teacher experiments, run the dataset entrypoint directly:
+
+```bash
+[DATASET]/venv/bin/python [DATASET]/src/pipelineDl/modelAssessment.py --best-params-mode auto [EXTRA_FLAGS]
+```
+
+Supported assessment flags:
+
+- `--baseline-only`: run only the baseline teacher retraining/evaluation and skip pruning, quantization, and distillation.
+- `--kd-enabled`: enable knowledge distillation.
+- `--prune-enabled`: enable pruning evaluation.
+- `--quant-enabled`: enable quantization evaluation.
+- `--teacher-checkpoint-root`: reuse teacher checkpoints from a previous assessment tag.
+- `--assessment-seeds`: override the default 5-seed evaluation with a comma-separated seed list.
+- `--output-tag`: write outputs under a custom result tag.
+- `--kd-student-variant`: choose the student capacity. `resnet` supports `small` (`resnet18`) and `medium` (`resnet34`); `mobilenetv3` and `shufflenet` currently support `small` only.
+- `--kd-alpha`: KD loss weighting.
+- `--kd-temperature`: KD temperature for classification runs such as EuroSAT. Hyperview's current regression KD path does not use temperature.
+
+### Shared-Teacher KD Workflow
+
+For controlled KD studies, first train the teacher once, then reuse those checkpoints in the KD run.
+
+1. Train only the baseline teacher:
+
+```bash
+EuroSAT/venv/bin/python EuroSAT/src/pipelineDl/modelAssessment.py \
+  --best-params-mode auto \
+  --baseline-only \
+  --assessment-seeds 11,22,33,44,55 \
+  --output-tag teacher_eurosat_5seed
+```
+
+2. Reuse that teacher for KD:
+
+```bash
+EuroSAT/venv/bin/python EuroSAT/src/pipelineDl/modelAssessment.py \
+  --best-params-mode auto \
+  --kd-enabled \
+  --kd-student-variant small \
+  --kd-alpha 0.75 \
+  --kd-temperature 4 \
+  --teacher-checkpoint-root EuroSAT/result/teacher_eurosat_5seed \
+  --assessment-seeds 11,22,33,44,55 \
+  --output-tag kd_eurosat_small_a0p75_t4_5seed
+```
+
+Notes:
+
+- Shared teacher checkpoints are matched by saved assessment seed, so the seed set must match between the baseline teacher run and the KD run.
+- If you use `--teacher-checkpoint-root`, point it at the tagged result directory that contains `ModelAssessment/test_<run>/`.
+- The repository documents stable Python entrypoints and `make` targets only. Ad hoc orchestration scripts for one-off sweeps should remain local and are not part of the supported interface.
 
 ## Maintenance & Cleanup
 Removes virtual environments and cached artifacts.
