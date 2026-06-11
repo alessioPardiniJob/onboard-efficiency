@@ -76,7 +76,6 @@ def initialize_environment(cache_dir: str) -> None:
     """Configure environment variables (e.g., cache paths)."""
     os.environ['TORCH_HOME'] = cache_dir
 
-
 def load_configurations(optuna_cfg_path: str, project_cfg_path: str):
     # Verifica esistenza file prima di caricare
     if not os.path.exists(optuna_cfg_path):
@@ -135,7 +134,7 @@ def prepare_dataset(root_path: str, split_ratio: float):
 def objective(trial, data, augmented_data, config) -> float:
 
 # Recuperiamo le scelte da riga di comando salvate nella config
-    model_choice = config.get("cli_model")  # 'rf' o 'xg'
+    model_choice = config.get("cli_model")  # 'rf' or 'gb'
     model_size = config.get("cli_size")   # 'small' o 'big'
 
     X_train_full, y_train_full = data
@@ -208,8 +207,7 @@ def objective(trial, data, augmented_data, config) -> float:
         else:
             print(f"[ERROR] Invalid model_size '{model_size}'. Expected 'big' or 'small'.")
             sys.exit(1)
-    elif model_choice == "xg":
-        #old configuration 
+    elif model_choice == "gb":
         if model_size == "big":
             n_est = trial.suggest_int("gb_n_estimators", 100, 300)
             lr    = trial.suggest_float("gb_learning_rate", 0.01, 0.2)
@@ -226,21 +224,21 @@ def objective(trial, data, augmented_data, config) -> float:
             lr    = trial.suggest_float("gb_learning_rate", 0.1, 0.3)
             md    = trial.suggest_int("gb_max_depth", 2, 6)
             subs  = trial.suggest_float("gb_subsample", 0.6, 0.9)
-            colsb = trial.suggest_float("gb_colsample_bytree", 0.5, 0.9)
+            max_feat = trial.suggest_float("gb_max_features", 0.5, 0.9)
 
             clf = GradientBoostingClassifier(
                 n_estimators=n_est,
                 learning_rate=lr,
                 max_depth=md,
                 subsample=subs,
-                max_features=colsb,
+                max_features=max_feat,
                 random_state=config['seed']
             )
         else:
             print(f"[ERROR] Invalid model_size '{model_size}'. Expected 'big' or 'small'.")
             sys.exit(1)
     else:
-        print(f"[ERROR] Invalid model_choice '{model_choice}'. Expected 'rf' or 'xg'.")
+        print(f"[ERROR] Invalid model_choice '{model_choice}'. Expected 'rf' or 'gb'.")
         sys.exit(1)
 
     
@@ -392,13 +390,13 @@ def my_model_builder(
             random_state=seed,
             n_jobs=-1
         )
-    elif model_type == 'xg':
+    elif model_type == 'gb':
         return GradientBoostingClassifier(
             n_estimators=params.get('gb_n_estimators', 100),
             learning_rate=params.get('gb_learning_rate', 0.1),
             max_depth=params.get('gb_max_depth', 3),
             subsample=params.get('gb_subsample', 1.0),
-            max_features=params.get('gb_colsample_bytree', None),
+            max_features=params.get('gb_max_features', None),
             random_state=seed
         )
     else:
@@ -426,8 +424,8 @@ def _get_selected_features(optuna_run_metrics: Dict[str, Any]) -> Dict[str, Any]
     return l_dct_selected_features  
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EuroSAT Classification Pipeline")
-    parser.add_argument("--model", type=str, default="rf", choices=["rf", "xg"], dest="cli_model",
-                        help="Model type: 'rf' or 'xg'")
+    parser.add_argument("--model", type=str, default="rf", choices=["rf", "gb"], dest="cli_model",
+                        help="Model type: 'rf' for Random Forest or 'gb' for scikit-learn Gradient Boosting")
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size",
                         help="Search space size")
     parser.add_argument("--debug", action="store_true", help="Enable debug/subsampling mode (loads a subset).")
@@ -546,4 +544,3 @@ if __name__ == "__main__":
         )
         
         print(f"[INFO] RUN {run_idx} COMPLETED SUCCESSFULLY.\n")
-

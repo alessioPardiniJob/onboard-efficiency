@@ -29,6 +29,7 @@ def resolve_kd_study_config(args, dataset_name):
             "temperature": 2.0 if args.kd_temperature is None else args.kd_temperature,
         },
         "student_variant": args.kd_student_variant or "small",
+        "student_family": getattr(args, "kd_student_family", None),
         "teacher_checkpoint_root": getattr(args, "teacher_checkpoint_root", None),
         "baseline_only": bool(getattr(args, "baseline_only", False)),
         "run_flags": {

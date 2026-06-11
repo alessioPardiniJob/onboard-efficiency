@@ -184,16 +184,23 @@ def extract_features_with_flags(data_list, mask_list, feature_flags=None):
         tqdm(zip(data_list, mask_list), total=len(data_list), desc="INFO: Preprocessing data with feature flags...")
     ):
         data = data / 2210
-        m = 1 - mask.astype(int)
-        image = data * m
-        average_edge.append((image.shape[1] + image.shape[2]) / 2)
-        image = _shape_pad(image)
+        average_edge.append((data.shape[1] + data.shape[2]) / 2)
 
-        s = np.linalg.svd(image, full_matrices=False, compute_uv=False)
-        s0, s1, s2, s3, s4 = s[:, 0], s[:, 1], s[:, 2], s[:, 3], s[:, 4]
-        dXds1 = s0 / (s1 + np.finfo(float).eps)
+        needs_svd = any(feature_flags[k] for k in ('dXds1', 's0', 's1', 's2', 's3', 's4', 'reals', 'imags'))
+        needs_arr = any(feature_flags[k] for k in ('arr', 'dXdl', 'd2Xdl2', 'd3Xdl3', 'real', 'imag', 'cAw1', 'cAw2'))
+        needs_fft_arr = feature_flags['real'] or feature_flags['imag']
+        needs_fft_s0 = feature_flags['reals'] or feature_flags['imags']
 
-        arr = filtering(np.ma.MaskedArray(data, mask))
+        s0 = s1 = s2 = s3 = s4 = dXds1 = None
+        if needs_svd:
+            m = 1 - mask.astype(int)
+            image = _shape_pad(data * m)
+            s = np.linalg.svd(image, full_matrices=False, compute_uv=False)
+            s0, s1, s2, s3, s4 = s[:, 0], s[:, 1], s[:, 2], s[:, 3], s[:, 4]
+            if feature_flags['dXds1']:
+                dXds1 = s0 / (s1 + np.finfo(float).eps)
+
+        arr = filtering(np.ma.MaskedArray(data, mask)) if needs_arr else None
 
         cAw1, cAw2 = None, None
         if feature_flags['cAw2']:
@@ -210,12 +217,23 @@ def extract_features_with_flags(data_list, mask_list, feature_flags=None):
             cAz, _ = pywt.dwt(cAy[1:-1], wavelet=w1, mode="constant")
             cAw1 = np.concatenate((cA0, cAx, cAy, cAz), -1)
 
-        dXdl, d2Xdl2, d3Xdl3 = np.gradient(arr, axis=0), np.gradient(np.gradient(arr, axis=0), axis=0), np.gradient(np.gradient(np.gradient(arr, axis=0), axis=0), axis=0)
+        dXdl = d2Xdl2 = d3Xdl3 = None
+        if feature_flags['dXdl'] or feature_flags['d2Xdl2'] or feature_flags['d3Xdl3']:
+            dXdl = np.gradient(arr, axis=0)
+            if feature_flags['d2Xdl2'] or feature_flags['d3Xdl3']:
+                d2Xdl2 = np.gradient(dXdl, axis=0)
+            if feature_flags['d3Xdl3']:
+                d3Xdl3 = np.gradient(d2Xdl2, axis=0)
 
-        fft = np.fft.fft(arr)
-        real, imag = np.real(fft), np.imag(fft)
-        ffts = np.fft.fft(s0)
-        reals, imags = np.real(ffts), np.imag(ffts)
+        real = imag = None
+        if needs_fft_arr:
+            fft = np.fft.fft(arr)
+            real, imag = np.real(fft), np.imag(fft)
+
+        reals = imags = None
+        if needs_fft_s0:
+            ffts = np.fft.fft(s0)
+            reals, imags = np.real(ffts), np.imag(ffts)
 
         features_to_concat = []
         if feature_flags['arr']: features_to_concat.append(arr)
@@ -235,7 +253,10 @@ def extract_features_with_flags(data_list, mask_list, feature_flags=None):
         if feature_flags['cAw1'] and cAw1 is not None: features_to_concat.append(cAw1)
         if feature_flags['cAw2'] and cAw2 is not None: features_to_concat.append(cAw2)
 
-        out_features = np.concatenate(features_to_concat, -1) if features_to_concat else arr
+        if features_to_concat:
+            out_features = np.concatenate(features_to_concat, -1)
+        else:
+            out_features = filtering(np.ma.MaskedArray(data, mask))
         processed_data.append(out_features)
 
     return np.array(processed_data), np.array(average_edge)
@@ -322,13 +343,13 @@ def my_model_builder(params: Dict[str, Any], config: Dict[str, Any]) -> utils.Mo
             n_jobs=-1
         )
 
-    elif model_type == "xg":
+    elif model_type == "gb":
         base = GradientBoostingRegressor(
             n_estimators=params.get("gb_n_estimators", 100),
             learning_rate=params.get("gb_learning_rate", 0.1),
             max_depth=params.get("gb_max_depth", 3),
             subsample=params.get("gb_subsample", 1.0),
-            max_features=params.get("gb_colsample_bytree", None),
+            max_features=params.get("gb_max_features", None),
             random_state=seed
         )
         return MultiOutputRegressor(base)
@@ -392,7 +413,8 @@ def find_best_params_from_history(base_results_path: str, model_type: str, model
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hyperview Model Assessment (Retraining)")
-    parser.add_argument("--model", type=str, default="rf", choices=["rf", "xg"], dest="cli_model", help="Model type")
+    parser.add_argument("--model", type=str, default="rf", choices=["rf", "gb"], dest="cli_model",
+                        help="Model type: 'rf' for Random Forest or 'gb' for scikit-learn Gradient Boosting.")
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size", help="Config size")
     parser.add_argument("--best-params-mode", type=str, default="manual", choices=["manual", "auto"], 
                         help="How to get hyperparameters: 'manual' (hardcoded) or 'auto' (from best previous result)")
@@ -477,7 +499,7 @@ if __name__ == "__main__":
 
     if args.best_params_mode == "manual":
         print(f"[INFO] Using manual best parameters.")
-        if args.cli_model == 'xg' and args.cli_size == 'small':
+        if args.cli_model == 'gb' and args.cli_size == 'small':
             best_params = {
                 "use_spectral": False,
                 "use_grad": True,
@@ -489,7 +511,7 @@ if __name__ == "__main__":
                 "gb_learning_rate": 0.11117122948337661,
                 "gb_max_depth": 6,
                 "gb_subsample": 0.8431831524232583,
-                "gb_colsample_bytree": 0.5181412045603372
+                "gb_max_features": 0.5181412045603372
             }
         elif args.cli_model == 'rf' and args.cli_size == 'small':
             best_params = {
@@ -515,7 +537,7 @@ if __name__ == "__main__":
                 "rf_n_estimators": 192,
                 "rf_max_depth": 44
             }
-        elif args.cli_model == 'xg' and args.cli_size == 'big':
+        elif args.cli_model == 'gb' and args.cli_size == 'big':
             best_params = {
                 "use_spectral": False,
                 "use_grad": True,
@@ -527,7 +549,7 @@ if __name__ == "__main__":
                 "gb_learning_rate": 0.022359159775903782,
                 "gb_max_depth": 9
             }
-        # Aggiungere eventuali fallback hardcoded qui per altre varianti come rf_small, rf_big, xg_big
+        # Aggiungere eventuali fallback hardcoded qui per altre varianti.
         else:
             print(f"[WARNING] No manual params defined for model {args.cli_model} and size {args.cli_size}. Using empty params.")
             best_params = {}

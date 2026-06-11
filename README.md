@@ -112,22 +112,22 @@ make setup-EuroSAT
 Runs Optuna-based hyperparameter tuning.
 
 ```bash
-make ml-select-[DATASET] MODEL=[rf|xg] SIZE=[small|big]
+make ml-select-[DATASET] MODEL=[rf|gb] SIZE=[small|big]
 ```
 **Example**
 ```bash
-make ml-select-EuroSAT MODEL=xg SIZE=small
+make ml-select-EuroSAT MODEL=gb SIZE=small
 ```
 ### 2. Model Assessment (Evaluation)
 
 Retrains the model using the best configuration and evaluates on the test set.
 
 ```bash
-make ml-assess-[DATASET] MODEL=[rf|xg] SIZE=[small|big] MODE=[manual|auto]
+make ml-assess-[DATASET] MODEL=[rf|gb] SIZE=[small|big] MODE=[manual|auto]
 ```
 **Example**
 ```bash
-make ml-assess-EuroSAT MODEL=xg SIZE=small MODE=manual
+make ml-assess-EuroSAT MODEL=gb SIZE=small MODE=manual
 ```
 ## Notes on Assessment
 

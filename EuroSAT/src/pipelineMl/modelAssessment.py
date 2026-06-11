@@ -159,13 +159,13 @@ def my_model_builder(params: Dict[str, Any], config: Dict[str, Any]) -> utils.Mo
             random_state=seed,
             n_jobs=-1
         )
-    elif model_type == 'xg':
+    elif model_type == 'gb':
         return GradientBoostingClassifier(
             n_estimators=params.get('gb_n_estimators', 100),
             learning_rate=params.get('gb_learning_rate', 0.1),
             max_depth=params.get('gb_max_depth', 3),
             subsample=params.get('gb_subsample', 1.0),
-            max_features=params.get('gb_colsample_bytree', None),
+            max_features=params.get('gb_max_features', None),
             random_state=seed
         )
     else:
@@ -230,7 +230,8 @@ def find_best_params_from_history(base_results_path: str, model_type: str, model
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="EuroSAT Model Assessment (Retraining)")
-    parser.add_argument("--model", type=str, default="rf", choices=["rf", "xg"], dest="cli_model", help="Model type")
+    parser.add_argument("--model", type=str, default="rf", choices=["rf", "gb"], dest="cli_model",
+                        help="Model type: 'rf' for Random Forest or 'gb' for scikit-learn Gradient Boosting.")
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size", help="Config size")
     parser.add_argument("--best-params-mode", type=str, default="manual", choices=["manual", "auto"], 
                         help="How to get hyperparameters: 'manual' (hardcoded) or 'auto' (from best previous result)")
@@ -317,7 +318,7 @@ if __name__ == "__main__":
                 "rf_max_features": 0.3362682243263383
 
             }
-        elif args.cli_model == 'xg' and args.cli_size == 'small':
+        elif args.cli_model == 'gb' and args.cli_size == 'small':
             best_params = {
                 "use_color_stats_feature": True,
                 "use_color_hist_feature": True,
@@ -329,7 +330,7 @@ if __name__ == "__main__":
                 "gb_learning_rate": 0.26663782445491496,
                 "gb_max_depth": 6,
                 "gb_subsample": 0.8138347307375998,
-                "gb_colsample_bytree": 0.6141181332252498
+                "gb_max_features": 0.6141181332252498
             }
         elif args.cli_model == 'rf' and args.cli_size == 'big':
             best_params = {
@@ -342,7 +343,7 @@ if __name__ == "__main__":
                 "rf_n_estimators": 266,
                 "rf_max_depth": 38
             }
-        elif args.cli_model == 'xg' and args.cli_size == 'big':
+        elif args.cli_model == 'gb' and args.cli_size == 'big':
             best_params = {
                 "use_color_stats_feature": True,
                 "use_color_hist_feature": True,

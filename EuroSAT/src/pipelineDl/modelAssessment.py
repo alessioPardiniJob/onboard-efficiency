@@ -144,6 +144,9 @@ def get_student_model(model_name, ds, student_variant="small"):
     elif variant_name == "resnet18":
         model = models.resnet18(weights=None)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
+    elif variant_name == "resnet34":
+        model = models.resnet34(weights=None)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
     elif variant_name == "resnet50":
         model = models.resnet50(weights=None)
         model.fc = nn.Linear(model.fc.in_features, num_classes)
@@ -193,7 +196,9 @@ def best_model_builder(
     else:
         model_name = params.get("model")
 
-    student_variant = config.get("kd_study", {}).get("student_variant", "small")
+    kd_study = config.get("kd_study", {})
+    student_variant = kd_study.get("student_variant", "small")
+    student_family = kd_study.get("student_family") or model_name
 
     if config["training_params"]["pretrained"]:
         pretrained = config["training_params"]["pretrained"]
@@ -216,7 +221,7 @@ def best_model_builder(
     if opt == "quant":
         model = get_quantization_model(model_name, ds)
     elif opt == "dist":
-        model = get_student_model(model_name, ds, student_variant)
+        model = get_student_model(student_family, ds, student_variant)
     else:
         model = get_model(model_name, pretrained, ds)
 
@@ -307,6 +312,7 @@ if __name__ == "__main__":
     parser.add_argument("--kd-alpha", type=float, default=None, help="KD alpha weight.")
     parser.add_argument("--kd-temperature", type=float, default=None, help="KD temperature for classification KD.")
     parser.add_argument("--kd-student-variant", type=str, default=None, choices=["small", "medium"], help="Student capacity variant.")
+    parser.add_argument("--kd-student-family", type=str, default=None, choices=["resnet", "mobilenetv3", "shufflenet"], help="Optional KD student architecture family override. Defaults to selected teacher family.")
     parser.add_argument("--teacher-checkpoint-root", type=str, default=None, help="Optional shared result root containing baseline teacher checkpoints to reuse across KD runs.")
     parser.add_argument("--output-tag", type=str, default=None, help="Optional suffix added to assessment output folder.")
     parser.add_argument("--assessment-seeds", type=str, default=None, help="Comma-separated seed override list.")

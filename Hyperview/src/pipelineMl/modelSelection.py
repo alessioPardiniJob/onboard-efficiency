@@ -532,7 +532,7 @@ def objective(trial,
             max_feat = trial.suggest_float("rf_max_features", 0.3, 0.8)
             model = RandomForestRegressor(n_estimators=n_est, max_depth=max_d, min_samples_leaf=min_leaf, max_features=max_feat, random_state=config['seed'])
     
-    elif model_choice == "xg":
+    elif model_choice == "gb":
         if model_size == "big":
             n_est = trial.suggest_int("gb_n_estimators", 100, 300)
             lr = trial.suggest_float("gb_learning_rate", 0.01, 0.2)
@@ -543,8 +543,8 @@ def objective(trial,
             lr = trial.suggest_float("gb_learning_rate", 0.1, 0.3)
             md = trial.suggest_int("gb_max_depth", 2, 6)
             subs = trial.suggest_float("gb_subsample", 0.6, 0.9)
-            colsb = trial.suggest_float("gb_colsample_bytree", 0.5, 0.9)
-            base = GradientBoostingRegressor(n_estimators=n_est, learning_rate=lr, max_depth=md, subsample=subs, max_features=colsb, random_state=config['seed'])
+            max_feat = trial.suggest_float("gb_max_features", 0.5, 0.9)
+            base = GradientBoostingRegressor(n_estimators=n_est, learning_rate=lr, max_depth=md, subsample=subs, max_features=max_feat, random_state=config['seed'])
         
         model = MultiOutputRegressor(base)
     
@@ -593,13 +593,13 @@ def my_model_builder(
             n_jobs=-1
         )
 
-    elif model_type == "xg":
+    elif model_type == "gb":
         base = GradientBoostingRegressor(
             n_estimators=params.get("gb_n_estimators", 100),
             learning_rate=params.get("gb_learning_rate", 0.1),
             max_depth=params.get("gb_max_depth", 3),
             subsample=params.get("gb_subsample", 1.0),
-            max_features=params.get("gb_colsample_bytree", None),
+            max_features=params.get("gb_max_features", None),
             random_state=seed
         )
         return MultiOutputRegressor(base)
@@ -840,7 +840,8 @@ def extract_hyperview_features_wrapper(dataset_info, feature_flags=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Hyperview Model Selection Pipeline")
-    parser.add_argument("--model", type=str, default="rf", choices=["rf", "xg"], dest="cli_model", help="Model type")
+    parser.add_argument("--model", type=str, default="rf", choices=["rf", "gb"], dest="cli_model",
+                        help="Model type: 'rf' for Random Forest or 'gb' for scikit-learn Gradient Boosting.")
     parser.add_argument("--size", type=str, default="small", choices=["small", "big"], dest="cli_size", help="Config size")
     parser.add_argument("--debug", action="store_true", help="Enable debug/subsampling mode (loads a small subset).")
     args = parser.parse_args()
@@ -1104,9 +1105,6 @@ if __name__ == "__main__":
                 "features_selected_metrics": features_selected_metrics
             }
         )
-
-
-
 
 
 

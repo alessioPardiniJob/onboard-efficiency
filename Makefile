@@ -11,7 +11,7 @@ PROJECT_ROOT := $(shell pwd)
 PYTHON ?= python3
 
 # Default parameters for ML pipelines (overridable via CLI)
-# Example usage: make ml-select-EuroSAT MODEL=xg SIZE=big
+# Example usage: make ml-select-EuroSAT MODEL=gb SIZE=big
 MODEL ?= rf
 SIZE ?= small
 MODE ?= manual
@@ -43,9 +43,9 @@ help:
 	@echo ""
 	@echo "Machine Learning Pipeline (Module: Pardini):"
 	@echo "  make ml-select-EuroSAT      : Executes Model Selection (Optuna optimization)."
-	@echo "                                Options: MODEL=rf|xg SIZE=small|big"
+	@echo "                                Options: MODEL=rf|gb SIZE=small|big"
 	@echo "  make ml-assess-EuroSAT      : Executes Model Assessment (Retraining best model)."
-	@echo "                                Options: MODEL=rf|xg SIZE=small|big"
+	@echo "                                Options: MODEL=rf|gb SIZE=small|big"
 	@echo ""
 	@echo "Deep Learning Pipeline (Module: DiPalma):"
 	@echo "  make dl-select-EuroSAT      : Executes DL Model Selection (Optuna optimization)."
